@@ -4,13 +4,13 @@
 int
 main(void) {
   //const char * str = " ";
-  const char * str = "(define a ((fun (a) "
-      "(define b (fun (b) (+ a b)))"
-      "b"
-      ") 1)) (define b ((fun (c) "
-      "(define b (fun (b) (+ c b (a 3))))"
-      "b"
-      ") 2)) (fun () 1)";
+  //const char * str = "(define a ((fun (a) "
+  //    "(define b (fun (b) (+ a b)))"
+  //    "b"
+  //    ") 1)) (define b ((fun (c) "
+  //    "(define b (fun (b) (+ c b (a 3))))"
+  //    "b"
+  //    ") 2)) (fun () 1)";
   //const char * str = "(define a ((fun (a) "
   //    "(define b (fun (b) (+ a b)))"
   //    "(define c (fun (b) (+ a b)))"
@@ -42,5 +42,13 @@ main(void) {
   //const char * str = "(((fun (a) (fun (b) (define c 1) (+ a b c))) 2) 3)";
   //const char * str = "((fun (b) (define c 1) (+ b c)) 1)";
   //const char * str = "(define a (fun (a) (fun (b) (define c 1) (+ a c))))";
+  const char * str =
+      "(define a (fun (a)"
+      "  (fun (b) (+ a b))"
+      "))"
+      "(define b (a 1))"
+      "(define c (a 2))"
+      "(print-num (b 3))"
+      "(print-num (c 4))";
   return feed(str);
 }

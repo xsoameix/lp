@@ -100,13 +100,13 @@ typedef struct {
 } gc_t;
 
 typedef struct {
-  env_t env;
+  env_t * env;
   struct node * node;
 } fun_t;
 
 typedef union {
-  int     i;
-  fun_t * f;
+  int   i;
+  fun_t f;
 } val_t;
 
 typedef struct {

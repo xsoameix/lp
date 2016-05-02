@@ -613,7 +613,7 @@ gc_ref_env(gc_t * gc, env_t * env) {
       if (!env->locs[i].ref) continue;
       obj_t * obj = &env->locs[i].obj;
       if (obj->type != OBJ_FUN) continue;
-      if (gc_ref_env(gc, &obj->val.f->env)) return 1;
+      if (gc_ref_env(gc, obj->val.f.env)) return 1;
     }
   }
   return 0;
@@ -661,30 +661,10 @@ gc_free(gc_t * gc) {
   free(gc);
 }
 
-fun_t *
-fun_new(node_t * node, env_t * prev, gc_t * gc) {
-  def_t * def = &node->val.d;
-  fun_t * fun = malloc(sizeof(* fun));
-  if (fun == NULL) return NULL;
-  loc_t * locs = malloc(sizeof(* fun->env.locs) * def->env);
-  if (locs == NULL) return free(fun), NULL;
-  fun->node = node;
-  env_t * env = &fun->env;
-  env->prev = prev;
-  env->locs = locs;
-  env->len = def->env;
-  for (size_t i = 0; i < def->env; i++) {
-    env->locs[i].ref = 0;
-    env->locs[i].obj.type = OBJ_NIL;
-  }
-  if (gc_add(gc, env, &env->id)) return free(locs), free(fun), NULL;
-  return fun;
-}
-
 void
-fun_free(fun_t * fun) {
-  free(fun->env.locs);
-  free(fun);
+fun_init(fun_t * fun, node_t * node, env_t * prev) {
+  fun->env = prev;
+  fun->node = node;
 }
 
 typedef int calc_t(int a, int b, int * ret);
@@ -765,31 +745,33 @@ eval(node_t * parent, env_t * prev, gc_t * gc, obj_t * obj) {
   } else if (parent->type == NOD_VAR) {
     return env_get(prev, &parent->val.v, obj), 0;
   } else if (parent->type == NOD_DEF) {
-    fun_t * fun = fun_new(parent, prev, gc);
-    if (fun == NULL) return 1;
-    return obj->val.f = fun, obj->type = OBJ_FUN, 0;
+    fun_init(&obj->val.f, parent, prev);
+    return obj->type = OBJ_FUN, 0;
   } else if (parent->type == NOD_FUN) {
     node_t * caller = parent->front;
     obj_t o;
     if (eval(caller, prev, gc, &o)) return 1;
     if (o.type != OBJ_FUN) return printf("variable is not function\n"), 1;
-    fun_t * fun = o.val.f;
+    fun_t * fun = &o.val.f;
     node_t * callee = fun->node;
     def_t * def = &callee->val.d;
     size_t len = 0;
     for (node_t * arg = caller->next; arg != NULL; arg = arg->next) len++;
     if (len != def->len) return printf("parameters length do not match\n"), 1;
+    env_t * env = env_new(fun->env, def->env);
+    if (env == NULL) return 1;
+    if (gc_add(gc, env, &env->id)) return env_free(env), 1;
     node_t * params = callee->front->next;
     node_t * arg = caller->next;
     for (size_t i = 0; i < def->len; i++, arg = arg->next) {
       obj_t ret;
-      if (eval(arg, prev, gc, &ret)) return 1;
+      if (eval(arg, prev, gc, &ret)) return env_free(env), 1;
       var_t var = {.env = 0, .off = def->args[i]};
-      env_set(&fun->env, &var, &ret);
+      env_set(env, &var, &ret);
     }
     obj->type = OBJ_NIL;
-    for (node_t * node = params->next; node != NULL; node = node->next)
-      if (eval(node, &fun->env, gc, obj)) return 1;
+    for (node_t * stmt = params->next; stmt != NULL; stmt = stmt->next)
+      if (eval(stmt, env, gc, obj)) return env_free(env), 1;
     return 0;
   } else if (parent->type == NOD_SET) {
     node_t * name = parent->front->next;
@@ -870,7 +852,7 @@ run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc) {
     else if (obj.type == OBJ_BOL)
       printf("obj %s BOL\n", obj.val.i ? "true" : "false");
     else if (obj.type == OBJ_FUN)
-      printf("obj %p FUN\n", (void *) obj.val.f);
+      printf("obj %p FUN\n", (void *) obj.val.f.node);
   }
   return 0;
 }
