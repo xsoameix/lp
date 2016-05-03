@@ -669,24 +669,24 @@ fun_init(fun_t * fun, node_t * node, env_t * prev) {
 typedef int calc_t(int a, int b, int * ret);
 
 int
-calc(node_t * parent, env_t * prev, gc_t * gc, calc_t * cb, char type,
+calc(node_t * parent, env_t * prev, gc_t * gc, calc_t * cb, char in, char out,
      int unary, obj_t * obj) {
   node_t * node = parent->front->next;
   obj_t a;
   if (eval(node, prev, gc, &a)) return 1;
-  if (a.type != type)
+  if (a.type != in)
     return printf("variable is not %s\n",
-                  type == OBJ_INT ? "integer" : "boolean"), 1;
+                  in == OBJ_INT ? "integer" : "boolean"), 1;
   while (node = node->next, node != NULL) {
     obj_t b;
     if (eval(node, prev, gc, &b)) return 1;
-    if (b.type != type)
+    if (b.type != in)
       return printf("variable is not %s\n",
-                    type == OBJ_INT ? "integer" : "boolean"), 1;
+                    in == OBJ_INT ? "integer" : "boolean"), 1;
     if (cb(a.val.i, b.val.i, &a.val.i)) return 1;
   }
   if (unary) if (cb(a.val.i, 0, &a.val.i)) return 1;
-  return obj->val.i = a.val.i, obj->type = type, 0;
+  return obj->val.i = a.val.i, obj->type = out, 0;
 }
 
 int lt(int a, int b, int * ret) { return * ret = a < b, 0; }
@@ -789,27 +789,27 @@ eval(node_t * parent, env_t * prev, gc_t * gc, obj_t * obj) {
       return printf("the return value of if-else statement is nil\n"), 1;
     return 0;
   } else if (parent->type == NOD_LT) {
-    return calc(parent, prev, gc, lt, OBJ_BOL, 0, obj);
+    return calc(parent, prev, gc, lt, OBJ_INT, OBJ_BOL, 0, obj);
   } else if (parent->type == NOD_GT) {
-    return calc(parent, prev, gc, gt, OBJ_BOL, 0, obj);
+    return calc(parent, prev, gc, gt, OBJ_INT, OBJ_BOL, 0, obj);
   } else if (parent->type == NOD_EQ) {
-    return calc(parent, prev, gc, eq, OBJ_BOL, 0, obj);
+    return calc(parent, prev, gc, eq, OBJ_INT, OBJ_BOL, 0, obj);
   } else if (parent->type == NOD_ADD) {
-    return calc(parent, prev, gc, add, OBJ_INT, 0, obj);
+    return calc(parent, prev, gc, add, OBJ_INT, OBJ_INT, 0, obj);
   } else if (parent->type == NOD_SUB) {
-    return calc(parent, prev, gc, sub, OBJ_INT, 0, obj);
+    return calc(parent, prev, gc, sub, OBJ_INT, OBJ_INT, 0, obj);
   } else if (parent->type == NOD_MUL) {
-    return calc(parent, prev, gc, mul, OBJ_INT, 0, obj);
+    return calc(parent, prev, gc, mul, OBJ_INT, OBJ_INT, 0, obj);
   } else if (parent->type == NOD_DIV) {
-    return calc(parent, prev, gc, idiv, OBJ_INT, 0, obj);
+    return calc(parent, prev, gc, idiv, OBJ_INT, OBJ_INT, 0, obj);
   } else if (parent->type == NOD_MOD) {
-    return calc(parent, prev, gc, mod, OBJ_INT, 0, obj);
+    return calc(parent, prev, gc, mod, OBJ_INT, OBJ_INT, 0, obj);
   } else if (parent->type == NOD_AND) {
-    return calc(parent, prev, gc, and, OBJ_BOL, 0, obj);
+    return calc(parent, prev, gc, and, OBJ_BOL, OBJ_BOL, 0, obj);
   } else if (parent->type == NOD_OR) {
-    return calc(parent, prev, gc, or, OBJ_BOL, 0, obj);
+    return calc(parent, prev, gc, or, OBJ_BOL, OBJ_BOL, 0, obj);
   } else if (parent->type == NOD_NOT) {
-    return calc(parent, prev, gc, not, OBJ_BOL, 1, obj);
+    return calc(parent, prev, gc, not, OBJ_BOL, OBJ_BOL, 1, obj);
   } else if (parent->type == NOD_PRN) {
     node_t * num = parent->front->next;
     obj_t o;
