@@ -870,3 +870,22 @@ feed(const char * str) {
   node_free(node);
   return 0;
 }
+
+int
+exec(const char * path) {
+  FILE * file = fopen(path, "rb");
+  if (file == NULL) return 1;
+  if (fseek(file, 0, SEEK_END)) return fclose(file), 1;
+  long lsize = ftell(file);
+  if (lsize == -1) return fclose(file), 1;
+  size_t size = (size_t) lsize;
+  rewind(file);
+  char * str = malloc(size + 1);
+  if (str == NULL) return fclose(file), 1;
+  if (fread(str, 1, size, file) != size) return free(str), fclose(file), 1;
+  str[size] = '\0';
+  if (feed(str)) return free(str), fclose(file), 1;
+  free(str);
+  fclose(file);
+  return 0;
+}

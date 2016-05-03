@@ -150,5 +150,6 @@ int semantic(node_t * parent, map_t * prev);
 int eval(node_t * parent, env_t * prev, gc_t * gc, obj_t * obj);
 int run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc);
 int feed(const char * str);
+int exec(const char * path);
 
 #endif
