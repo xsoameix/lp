@@ -439,9 +439,9 @@ semantic(node_t * parent, map_t * prev) {
         return printf("variable value is empty\n"), 1;
       if (value->next != NULL)
         return printf("multiple variable values is not allowed\n"), 1;
-      if (variables(value, prev)) return 1;
       tok_t * t = &name->val.t;
       if (map_set(prev, t->begin, t->end, &name->val.v)) return 1;
+      if (variables(value, prev)) return 1;
       name->type = NOD_VAR;
       return parent->type = NOD_SET, 0;
     } else if (!tokcmp(tok, "if")) {
