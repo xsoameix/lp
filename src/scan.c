@@ -509,7 +509,6 @@ env_new(env_t * ret, env_t * prev, size_t len) {
   loc_t * locs = malloc(sizeof(* env->locs) * len);
   if (locs == NULL) return free(env), NULL;
   for (size_t i = 0; i < len; i++) {
-    locs[i].ref = 0;
     locs[i].obj.type = OBJ_NIL;
   }
   env->ret = ret;
@@ -531,7 +530,6 @@ env_add(env_t * env, size_t len) {
   loc_t * locs = realloc(env->locs, sizeof(* locs) * len);
   if (locs == NULL) return 1;
   for (size_t i = env->len; i < len; i++) {
-    locs[i].ref = 0;
     locs[i].obj.type = OBJ_NIL;
   }
   env->locs = locs;
@@ -608,12 +606,10 @@ gc_ref_env(gc_t * gc, env_t * env) {
   for (env_t * e = env; e != NULL; e = e->prev) {
     addr_t * addr = &gc->addrs[e->id];
     if (addr->mark == GC_MARK) break;
-    printf("env prev %p mark\n", (void *) e);
     addr->mark = GC_MARK;
   }
   for (env_t * e = env; e != NULL; e = e->prev) {
     for (size_t i = 0; i < e->len; i++) {
-      //if (!e->locs[i].ref) continue;
       obj_t * obj = &e->locs[i].obj;
       if (obj->type != OBJ_FUN) continue;
       env_t * to = obj->val.f.env;

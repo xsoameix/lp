@@ -51,12 +51,12 @@ main(void) {
   //    "(print-num (b 3))"
   //    "(print-num (c 4))";
   //const char * str = "(define a a) ((fun () a))";
-  //const char * str =
-  //    "(define a (fun (x) "
-  //    "  (define x (- x 1))"
-  //    "  (if (> x 0) (a x) #f)"
-  //    "  (print-num x)"
-  //    "  #t))"
-  //    "(a 10)";
+  const char * str =
+      "(define a (fun (x) "
+      "  (define x (- x 1))"
+      "  (if (> x 0) (a x) #f)"
+      "  (print-num x)"
+      "  #t))"
+      "(a 10)";
   return feed(str);
 }

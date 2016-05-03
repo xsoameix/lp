@@ -116,7 +116,6 @@ typedef struct {
 } obj_t;
 
 typedef struct loc {
-  char ref;
   obj_t obj;
 } loc_t; // local
 
