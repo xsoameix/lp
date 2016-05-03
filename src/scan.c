@@ -503,7 +503,7 @@ semantic(node_t * parent, map_t * prev) {
 }
 
 env_t *
-env_new(env_t * prev, size_t len) {
+env_new(env_t * ret, env_t * prev, size_t len) {
   env_t * env = malloc(sizeof(* env));
   if (env == NULL) return NULL;
   loc_t * locs = malloc(sizeof(* env->locs) * len);
@@ -512,6 +512,7 @@ env_new(env_t * prev, size_t len) {
     locs[i].ref = 0;
     locs[i].obj.type = OBJ_NIL;
   }
+  env->ret = ret;
   env->prev = prev;
   env->locs = locs;
   env->len = len;
@@ -539,7 +540,7 @@ env_add(env_t * env, size_t len) {
 }
 
 void
-env_dump(env_t * env);
+env_dump(env_t * env, int ret);
 
 void
 env_get(env_t * env, var_t * var, obj_t * obj) {
@@ -554,9 +555,9 @@ env_set(env_t * env, var_t * var, obj_t * obj) {
 }
 
 void
-env_dump(env_t * env) {
-  for (size_t i = 0; env != NULL; env = env->prev, i++) {
-    printf("--- scope %zu ---\n", i);
+env_dump(env_t * env, int ret) {
+  for (size_t i = 0; env != NULL; env = ret ? env->ret : env->prev, i++) {
+    printf("--- scope %zu --- %p\n", i, (void *) env);
     printf("  variables size: %zu\n", env->len);
   }
   printf("---------------\n");
@@ -574,13 +575,13 @@ gc_new(void) {
 int
 gc_overflow(gc_t * gc) {
   printf("gc: %zu\n", gc->len);
-  return gc->len > 2;
+  return gc->len > 0;
 }
 
 int
 gc_add(gc_t * gc, env_t * env, size_t * id) {
   if (gc_overflow(gc)) {
-    if (gc_cleanup(gc, env->prev)) return 1;
+    if (gc_cleanup(gc, env->ret)) return 1;
     printf("gc: %zu (cleanup)\n", gc->len);
   }
   if (gc->len + 1 > gc->capa) {
@@ -602,33 +603,31 @@ gc_ref(gc_t * gc, size_t id, size_t to) {
   return rec->to = to, 0;
 }
 
-int
+void
 gc_ref_env(gc_t * gc, env_t * env) {
-  for (; env != NULL; env = env->prev) {
-    addr_t * addr = &gc->addrs[env->id];
-    if (addr->mark == GC_MARK) continue;
+  for (env_t * e = env; e != NULL; e = e->prev) {
+    addr_t * addr = &gc->addrs[e->id];
+    if (addr->mark == GC_MARK) break;
+    printf("env prev %p mark\n", (void *) e);
     addr->mark = GC_MARK;
-    if (gc_ref_env(gc, env->prev)) return 1;
-    for (size_t i = 0; i < env->len; i++) {
-      if (!env->locs[i].ref) continue;
-      obj_t * obj = &env->locs[i].obj;
+  }
+  for (env_t * e = env; e != NULL; e = e->prev) {
+    for (size_t i = 0; i < e->len; i++) {
+      //if (!e->locs[i].ref) continue;
+      obj_t * obj = &e->locs[i].obj;
       if (obj->type != OBJ_FUN) continue;
-      if (gc_ref_env(gc, obj->val.f.env)) return 1;
+      env_t * to = obj->val.f.env;
+      if (gc->addrs[to->id].mark == GC_MARK) continue;
+      gc_ref_env(gc, to);
     }
   }
-  return 0;
 }
 
 int
 gc_cleanup(gc_t * gc, env_t * env) {
   for (size_t i = 0; i < gc->len; i++) gc->addrs[i].mark = GC_NIL;
-  for (env_t * e = env; e != NULL; e = e->prev)
-    for (size_t i = 0; i < e->len; i++)
-      e->locs[i].ref++;
-  if (gc_ref_env(gc, env)) return 1;
-  for (env_t * e = env; e != NULL; e = e->prev)
-    for (size_t i = 0; i < e->len; i++)
-      e->locs[i].ref--;
+  for (env_t * e = env; e != NULL; e = e->ret)
+    gc_ref_env(gc, e);
   size_t len = 0;
   for (size_t i = 0; i < gc->len; i++)
     if (gc->addrs[i].mark == GC_MARK) {
@@ -758,7 +757,7 @@ eval(node_t * parent, env_t * prev, gc_t * gc, obj_t * obj) {
     size_t len = 0;
     for (node_t * arg = caller->next; arg != NULL; arg = arg->next) len++;
     if (len != def->len) return printf("parameters length do not match\n"), 1;
-    env_t * env = env_new(fun->env, def->env);
+    env_t * env = env_new(prev, fun->env, def->env);
     if (env == NULL) return 1;
     if (gc_add(gc, env, &env->id)) return env_free(env), 1;
     node_t * params = callee->front->next;
@@ -863,7 +862,7 @@ feed(const char * str) {
   if (node == NULL) return 1;
   map_t map;
   map_init(&map, NULL);
-  env_t * env = env_new(NULL, 0);
+  env_t * env = env_new(NULL, NULL, 0);
   if (env == NULL) return node_free(node), 1;
   gc_t * gc = gc_new();
   if (gc == NULL) return env_free(env), 1;

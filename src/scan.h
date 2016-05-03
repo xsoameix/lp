@@ -75,6 +75,7 @@ typedef union {
 } nval_t;
 
 typedef struct env {
+  struct env * ret;
   struct env * prev;
   struct loc * locs;
   size_t  len;
@@ -135,7 +136,7 @@ void node_free(node_t * root);
 void map_init(map_t * map, map_t * prev);
 void map_free(map_t * map);
 
-env_t * env_new(env_t * prev, size_t len);
+env_t * env_new(env_t * ret, env_t * prev, size_t len);
 int env_add(env_t * env, size_t len);
 void env_free(env_t * env);
 
