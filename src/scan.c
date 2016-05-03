@@ -459,7 +459,7 @@ semantic(node_t * parent, map_t * prev) {
     } else if (!tokcmp(tok, "<")) {
       return binary(parent, prev, NOD_LT, 0);
     } else if (!tokcmp(tok, ">")) {
-      return binary(parent, prev, NOD_LT, 0);
+      return binary(parent, prev, NOD_GT, 0);
     } else if (!tokcmp(tok, "=")) {
       return binary(parent, prev, NOD_EQ, 0);
     } else if (!tokcmp(tok, "+")) {
