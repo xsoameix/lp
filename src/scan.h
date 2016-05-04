@@ -44,6 +44,8 @@
 typedef struct {
   const char * begin;
   const char * end;
+  const char * line;
+  size_t lnum;
   int id;
 } tok_t;
 
@@ -67,9 +69,7 @@ typedef struct {
 } def_t;
 
 typedef union {
-  tok_t t;
   int   i;
-  char  b;
   var_t v;
   def_t d;
 } nval_t;
@@ -124,6 +124,7 @@ typedef struct node {
   struct node * next;
   struct node * front;
   struct node * back;
+  tok_t tok;
   int type;
   nval_t val;
 } node_t;
@@ -144,12 +145,16 @@ int gc_add(gc_t * gc, env_t * env, size_t * id);
 int gc_cleanup(gc_t * gc, env_t * env);
 void gc_free(gc_t * gc);
 
-int scan(const char * str, const char ** begin, const char ** end);
-int parse(const char ** str, node_t * parent);
-int semantic(node_t * parent, map_t * prev);
-int eval(node_t * parent, env_t * prev, gc_t * gc, obj_t * obj);
-int run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc);
-int feed(const char * str);
+int scan(const char * str, const char ** begin, const char ** end,
+    const char ** line, size_t * lnum);
+int parse(const char ** str, node_t * parent,
+    const char * file, const char ** line, size_t * lnum);
+int semantic(node_t * parent, map_t * prev, const char * file);
+int eval(node_t * parent, env_t * prev, gc_t * gc, const char * file,
+    obj_t * obj);
+int run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc,
+    const char * file);
+int feed(const char * str, const char * file);
 int exec(const char * path);
 
 #endif
