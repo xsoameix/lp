@@ -607,7 +607,7 @@ semantic(node_t * parent, map_t * prev, const char * file) {
 }
 
 env_t *
-env_new(env_t * ret, env_t * prev, size_t len) {
+env_new(env_t * prev, env_t * ret, size_t len) {
   env_t * env = malloc(sizeof(* env));
   if (env == NULL) return NULL;
   loc_t * locs = malloc(sizeof(* env->locs) * len);
@@ -683,7 +683,7 @@ gc_overflow(gc_t * gc) {
 int
 gc_add(gc_t * gc, env_t * env, size_t * id) {
   if (gc_overflow(gc)) {
-    if (gc_cleanup(gc, env->ret)) return 1;
+    if (gc_cleanup(gc, env->prev, env->ret)) return 1;
     //printf("gc: %zu (cleanup)\n", gc->len);
   }
   if (gc->len + 1 > gc->capa) {
@@ -724,9 +724,10 @@ gc_ref_env(gc_t * gc, env_t * env) {
 }
 
 int
-gc_cleanup(gc_t * gc, env_t * env) {
+gc_cleanup(gc_t * gc, env_t * prev, env_t * stack) {
   for (size_t i = 0; i < gc->len; i++) gc->addrs[i].mark = GC_NIL;
-  for (env_t * e = env; e != NULL; e = e->ret)
+  gc_ref_env(gc, prev);
+  for (env_t * e = stack; e != NULL; e = e->ret)
     gc_ref_env(gc, e);
   size_t len = 0;
   for (size_t i = 0; i < gc->len; i++)
@@ -750,7 +751,7 @@ gc_cleanup(gc_t * gc, env_t * env) {
 
 void
 gc_free(gc_t * gc) {
-  gc_cleanup(gc, NULL);
+  gc_cleanup(gc, NULL, NULL);
   for (size_t i = 0; i < gc->len; i++)
     for (rec_t * rec = gc->addrs[i].rec; rec != NULL;) {
       rec_t * next = rec->next;
@@ -769,19 +770,20 @@ fun_init(fun_t * fun, node_t * node, env_t * prev) {
 typedef int calc_t(int a, int b, tok_t * tok, const char * file, int * ret);
 
 int
-calc(node_t * parent, env_t * prev, gc_t * gc, calc_t * cb, char in, char out,
+calc(node_t * parent, env_t * prev, env_t * stack,
+     gc_t * gc, calc_t * cb, char in, char out,
      int unary, const char * file, obj_t * obj) {
   tok_t * ptok = &parent->tok;
   node_t * node = parent->front->next;
   obj_t a;
-  if (eval(node, prev, gc, file, &a)) return 1;
+  if (eval(node, prev, stack, gc, file, &a)) return 1;
   tok_t * atok = &node->tok;
   if (a.type != in)
     return error(atok, file, "variable is not %s\n",
                  in == OBJ_INT ? "integer" : "boolean"), 1;
   while (node = node->next, node != NULL) {
     obj_t b;
-    if (eval(node, prev, gc, file, &b)) return 1;
+    if (eval(node, prev, stack, gc, file, &b)) return 1;
     tok_t * btok = &node->tok;
     if (b.type != in)
       return error(btok, file, "variable is not %s\n",
@@ -867,7 +869,8 @@ not(int a, int b, tok_t * tok, const char * file, int * ret) {
 }
 
 int
-eval(node_t * parent, env_t * prev, gc_t * gc, const char * file, obj_t * obj) {
+eval(node_t * parent, env_t * prev, env_t * stack,
+     gc_t * gc, const char * file, obj_t * obj) {
   if (parent->type == NOD_INT) {
     return obj->val.i = parent->val.i, obj->type = OBJ_INT, 0;
   } else if (parent->type == NOD_BOL) {
@@ -880,7 +883,7 @@ eval(node_t * parent, env_t * prev, gc_t * gc, const char * file, obj_t * obj) {
   } else if (parent->type == NOD_FUN) {
     node_t * caller = parent->front;
     obj_t o;
-    if (eval(caller, prev, gc, file, &o)) return 1;
+    if (eval(caller, prev, stack, gc, file, &o)) return 1;
     tok_t * ctok = &caller->tok;
     if (o.type != OBJ_FUN)
       return error(ctok, file, "variable is not function\n"), 1;
@@ -892,67 +895,67 @@ eval(node_t * parent, env_t * prev, gc_t * gc, const char * file, obj_t * obj) {
     tok_t * ptok = &parent->tok;
     if (len != def->len)
       return error(ptok, file, "parameters length do not match\n"), 1;
-    env_t * env = env_new(prev, fun->env, def->env);
+    env_t * env = env_new(fun->env, stack, def->env);
     if (env == NULL) return 1;
     if (gc_add(gc, env, &env->id)) return env_free(env), 1;
     node_t * params = callee->front->next;
     node_t * arg = caller->next;
     for (size_t i = 0; i < def->len; i++, arg = arg->next) {
       obj_t ret;
-      if (eval(arg, prev, gc, file, &ret)) return env_free(env), 1;
+      if (eval(arg, prev, env, gc, file, &ret)) return 1;
       var_t var = {.env = 0, .off = def->args[i]};
       env_set(env, &var, &ret);
     }
     obj->type = OBJ_NIL;
     for (node_t * stmt = params->next; stmt != NULL; stmt = stmt->next)
-      if (eval(stmt, env, gc, file, obj)) return env_free(env), 1;
+      if (eval(stmt, env, env, gc, file, obj)) return 1;
     return 0;
   } else if (parent->type == NOD_SET) {
     node_t * name = parent->front->next;
     obj_t o;
-    if (eval(name->next, prev, gc, file, &o)) return 1;
+    if (eval(name->next, prev, stack, gc, file, &o)) return 1;
     env_set(prev, &name->val.v, &o);
     return obj->type = OBJ_NIL, 0;
   } else if (parent->type == NOD_IF) {
     node_t * cond = parent->front->next;
     obj_t o;
-    if (eval(cond, prev, gc, file, &o)) return 1;
+    if (eval(cond, prev, stack, gc, file, &o)) return 1;
     tok_t * tok = &cond->tok;
     if (o.type != OBJ_BOL)
       return error(tok, file, "variable is not boolean\n"), 1;
     node_t * stmt = o.val.i ? cond->next : cond->next->next;
-    if (eval(stmt, prev, gc, file, obj)) return 1;
+    if (eval(stmt, prev, stack, gc, file, obj)) return 1;
     tok_t * stok = &stmt->tok;
     if (obj->type == OBJ_NIL)
       return error(stok, file,
                    "the return value of if-else statement is nil\n"), 1;
     return 0;
   } else if (parent->type == NOD_LT) {
-    return calc(parent, prev, gc, lt, OBJ_INT, OBJ_BOL, 0, file, obj);
+    return calc(parent, prev, stack, gc, lt, OBJ_INT, OBJ_BOL, 0, file, obj);
   } else if (parent->type == NOD_GT) {
-    return calc(parent, prev, gc, gt, OBJ_INT, OBJ_BOL, 0, file, obj);
+    return calc(parent, prev, stack, gc, gt, OBJ_INT, OBJ_BOL, 0, file, obj);
   } else if (parent->type == NOD_EQ) {
-    return calc(parent, prev, gc, eq, OBJ_INT, OBJ_BOL, 0, file, obj);
+    return calc(parent, prev, stack, gc, eq, OBJ_INT, OBJ_BOL, 0, file, obj);
   } else if (parent->type == NOD_ADD) {
-    return calc(parent, prev, gc, add, OBJ_INT, OBJ_INT, 0, file, obj);
+    return calc(parent, prev, stack, gc, add, OBJ_INT, OBJ_INT, 0, file, obj);
   } else if (parent->type == NOD_SUB) {
-    return calc(parent, prev, gc, sub, OBJ_INT, OBJ_INT, 0, file, obj);
+    return calc(parent, prev, stack, gc, sub, OBJ_INT, OBJ_INT, 0, file, obj);
   } else if (parent->type == NOD_MUL) {
-    return calc(parent, prev, gc, mul, OBJ_INT, OBJ_INT, 0, file, obj);
+    return calc(parent, prev, stack, gc, mul, OBJ_INT, OBJ_INT, 0, file, obj);
   } else if (parent->type == NOD_DIV) {
-    return calc(parent, prev, gc, idiv, OBJ_INT, OBJ_INT, 0, file, obj);
+    return calc(parent, prev, stack, gc, idiv, OBJ_INT, OBJ_INT, 0, file, obj);
   } else if (parent->type == NOD_MOD) {
-    return calc(parent, prev, gc, mod, OBJ_INT, OBJ_INT, 0, file, obj);
+    return calc(parent, prev, stack, gc, mod, OBJ_INT, OBJ_INT, 0, file, obj);
   } else if (parent->type == NOD_AND) {
-    return calc(parent, prev, gc, and, OBJ_BOL, OBJ_BOL, 0, file, obj);
+    return calc(parent, prev, stack, gc, and, OBJ_BOL, OBJ_BOL, 0, file, obj);
   } else if (parent->type == NOD_OR) {
-    return calc(parent, prev, gc, or, OBJ_BOL, OBJ_BOL, 0, file, obj);
+    return calc(parent, prev, stack, gc, or, OBJ_BOL, OBJ_BOL, 0, file, obj);
   } else if (parent->type == NOD_NOT) {
-    return calc(parent, prev, gc, not, OBJ_BOL, OBJ_BOL, 1, file, obj);
+    return calc(parent, prev, stack, gc, not, OBJ_BOL, OBJ_BOL, 1, file, obj);
   } else if (parent->type == NOD_PRN) {
     node_t * num = parent->front->next;
     obj_t o;
-    if (eval(num, prev, gc, file, &o)) return 1;
+    if (eval(num, prev, stack, gc, file, &o)) return 1;
     tok_t * tok = &num->tok;
     if (o.type != OBJ_INT)
       return error(tok, file, "the argument of print-num is not integer\n"), 1;
@@ -961,7 +964,7 @@ eval(node_t * parent, env_t * prev, gc_t * gc, const char * file, obj_t * obj) {
   } else if (parent->type == NOD_PRB) {
     node_t * num = parent->front->next;
     obj_t o;
-    if (eval(num, prev, gc, file, &o)) return 1;
+    if (eval(num, prev, stack, gc, file, &o)) return 1;
     tok_t * tok = &num->tok;
     if (o.type != OBJ_BOL)
       return error(tok, file, "the argument of print-bool is not boolean\n"), 1;
@@ -998,7 +1001,7 @@ run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc,
   //node_dump(parent);
   for (node_t * node = parent->front; node != NULL; node = node->next) {
     obj_t obj;
-    if (eval(node, env, gc, file, &obj)) return 1;
+    if (eval(node, env, env, gc, file, &obj)) return 1;
     //pobj(&obj);
   }
   return 0;

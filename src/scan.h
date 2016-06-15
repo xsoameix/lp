@@ -143,7 +143,7 @@ void env_free(env_t * env);
 
 gc_t * gc_new(void);
 int gc_add(gc_t * gc, env_t * env, size_t * id);
-int gc_cleanup(gc_t * gc, env_t * env);
+int gc_cleanup(gc_t * gc, env_t * prev, env_t * stack);
 void gc_free(gc_t * gc);
 
 int scan(const char * str, const char ** begin, const char ** end,
@@ -151,8 +151,8 @@ int scan(const char * str, const char ** begin, const char ** end,
 int parse(const char ** str, node_t * parent,
     const char * file, const char ** line, size_t * lnum);
 int semantic(node_t * parent, map_t * prev, const char * file);
-int eval(node_t * parent, env_t * prev, gc_t * gc, const char * file,
-    obj_t * obj);
+int eval(node_t * parent, env_t * prev, env_t * stack,
+    gc_t * gc, const char * file, obj_t * obj);
 int run(const char * str, node_t * parent, map_t * map, env_t * env, gc_t * gc,
     const char * file);
 int feed(const char * str, const char * file);
