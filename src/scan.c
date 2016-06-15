@@ -442,8 +442,7 @@ variables(node_t * node, map_t * prev, const char * file) {
       tok_t * tok = &node->tok;
       var_t var;
       if (!map_get(prev, tok->begin, tok->end, &var))
-        return error(tok, file, "variable %.*s is undefined\n",
-                     (int) (tok->end - tok->begin), tok->begin), 1;
+        return printf("Error: Expect ID.\n"), 1;
       node->val.v = var, node->type = NOD_VAR;
     }
   return 0;
@@ -466,8 +465,7 @@ binary(node_t * parent, map_t * prev, int type, int multi, const char * file) {
   node_t * node = parent->front;
   if (node->next == NULL ||
       node->next->next == NULL)
-    return error(tok, file,
-                 "the binary operation requires at least two operands\n"), 1;
+    return printf("Need 2 arguments, but got %d.\n", node->next != NULL), 1;
   if (node->next->next->next != NULL && !multi)
     return error(tok, file,
                  "the binary operation requires only two operands\n"), 1;
@@ -599,8 +597,7 @@ semantic(node_t * parent, map_t * prev, const char * file) {
       if (variables(node->next, prev, file)) return 1;
       return parent->type = NOD_PRB, 0;
     } else {
-      return error(tok, file, "variable %.*s is undefined\n",
-                   (int) (tok->end - tok->begin), tok->begin), 1;
+      return printf("Error: Expect ID.\n"), 1;
     }
   } else {
     return 1;
@@ -762,15 +759,12 @@ calc(node_t * parent, env_t * prev, env_t * stack,
   if (eval(node, prev, stack, gc, file, &a)) return 1;
   tok_t * atok = &node->tok;
   if (a.type != in)
-    return error(atok, file, "variable is not %s\n",
-                 in == OBJ_INT ? "integer" : "boolean"), 1;
+    return printf("Type error!\n"), 1;
   while (node = node->next, node != NULL) {
     obj_t b;
     if (eval(node, prev, stack, gc, file, &b)) return 1;
-    tok_t * btok = &node->tok;
     if (b.type != in)
-      return error(btok, file, "variable is not %s\n",
-                   in == OBJ_INT ? "integer" : "boolean"), 1;
+      return printf("Type error!\n"), 1;
     if (cb(a.val.i, b.val.i, ptok, file, &a.val.i)) return 1;
   }
   if (unary) if (cb(a.val.i, 0, atok, file, &a.val.i)) return 1;
