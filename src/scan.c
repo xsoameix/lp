@@ -56,6 +56,14 @@ scan(const char * str, const char ** begin, const char ** end,
              c == '-' ||
              c == '*' ||
              c == '/') {
+    if (c == '-') {
+      if ((c = * ++str) >= '0' && c <= '9') {
+        while ((c = * ++str) >= '0' && c <= '9');
+        return * begin = token, * end = str, * line = l, * lnum = num, TOK_NUM;
+      } else {
+        return * begin = token, * end = str, * line = l, * lnum = num, TOK_ID;
+      }
+    }
     return * begin = token, * end = str + 1, * line = l, * lnum = num, TOK_ID;
   } else {
     return * begin = token, * end = str, * line = l, * lnum = num, TOK_NIL;
@@ -393,16 +401,24 @@ tokcmp(tok_t * tok, const char * str) {
 
 int
 toktoi(tok_t * tok, const char * file, int * ret) {
-  int i = 0;
-  for (const char * ptr = tok->begin; ptr < tok->end; ptr++) {
+  int i = 0, sign = 0;
+  const char * ptr = tok->begin;
+  if (* ptr == '-') sign = 1, ptr++;
+  for (; ptr < tok->end; ptr++) {
     if (i > INT_MAX / 10 ||
         i < INT_MIN / 10)
       return error(tok, file, "integer buffer overflow\n"), 1;
     i *= 10;
     int c = * ptr - '0';
-    if (i > INT_MAX - c)
-      return error(tok, file, "integer buffer overflow\n"), 1;
-    i += c;
+    if (sign) {
+      if (i < INT_MIN + c)
+        return error(tok, file, "integer buffer overflow\n"), 1;
+      i -= c;
+    } else {
+      if (i > INT_MAX - c)
+        return error(tok, file, "integer buffer overflow\n"), 1;
+      i += c;
+    }
   }
   return * ret = i, 0;
 }
