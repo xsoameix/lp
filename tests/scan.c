@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <check.h>
-#include <main.h>
 #include "scan.h"
 
 START_TEST(test_scan) {

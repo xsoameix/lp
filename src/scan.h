@@ -83,14 +83,8 @@ typedef struct env {
   size_t  id;
 } env_t;
 
-typedef struct rec {
-  struct rec * next;
-  size_t to;
-} rec_t; // record
-
 typedef struct addr {
   env_t * val;
-  rec_t * rec;
   char    mark;
   size_t  compat;
 } addr_t;

@@ -692,17 +692,8 @@ gc_add(gc_t * gc, env_t * env, size_t * id) {
     if (addrs == NULL) return 1;
     gc->addrs = addrs, gc->capa = request;
   }
-  gc->addrs[gc->len] = (addr_t) {.val = env, .rec = NULL};
+  gc->addrs[gc->len] = (addr_t) {.val = env};
   return * id = gc->len++, 0;
-}
-
-int
-gc_ref(gc_t * gc, size_t id, size_t to) {
-  rec_t * rec = malloc(sizeof(* rec));
-  if (rec == NULL) return 1;
-  addr_t * addr = &gc->addrs[id];
-  rec->next = addr->rec, addr->rec = rec;
-  return rec->to = to, 0;
 }
 
 void
@@ -735,10 +726,6 @@ gc_cleanup(gc_t * gc, env_t * prev, env_t * stack) {
       gc->addrs[i].compat = len;
       gc->addrs[i].val->id = len++;
     } else {
-      for (rec_t * rec = gc->addrs[i].rec; rec != NULL;) {
-        rec_t * next = rec->next;
-        free(rec), rec = next;
-      }
       env_free(gc->addrs[i].val);
     }
   for (size_t i = 0; i < gc->len; i++) {
@@ -752,11 +739,6 @@ gc_cleanup(gc_t * gc, env_t * prev, env_t * stack) {
 void
 gc_free(gc_t * gc) {
   gc_cleanup(gc, NULL, NULL);
-  for (size_t i = 0; i < gc->len; i++)
-    for (rec_t * rec = gc->addrs[i].rec; rec != NULL;) {
-      rec_t * next = rec->next;
-      free(rec), rec = next;
-    }
   free(gc->addrs);
   free(gc);
 }
