@@ -29,7 +29,7 @@ scan(const char * str, const char ** begin, const char ** end,
       if (!(((c = * ++str) >= '0' && c <= '9') ||
             (c >= 'a' && c <= 'z') ||
             (c >= 'A' && c <= 'Z')))
-        return * begin = token, * end = str, * line = l, * lnum = num, TOK_BOL;
+        return * begin = token, * end = str, * line = l, * lnum = num, TOK_SYM;
     for (; ((c >= '0' && c <= '9') ||
             (c >= 'a' && c <= 'z') ||
             (c >= 'A' && c <= 'Z')); c = * ++str);
@@ -167,6 +167,7 @@ node_dump(node_t * root) {
     for (size_t i = 0; i < indent; i++) putchar(' ');
     if (node->type == NOD_NIL) {
     } else if (node->type == NOD_NUM ||
+               node->type == NOD_SYM ||
                node->type == NOD_ID) {
       tok_t * tok = &node->tok;
       printf("%.*s ", (int) (tok->end - tok->begin), tok->begin);
@@ -322,8 +323,8 @@ parse(const char ** str, node_t * parent,
         if (parse(str, node, file, line, lnum)) return 1;
       } else if (tok == TOK_NUM) {
         if (fetch(str, TOK_NUM, node, NOD_NUM, line, lnum)) return 1;
-      } else if (tok == TOK_BOL) {
-        if (fetch(str, TOK_BOL, node, NOD_BOL, line, lnum)) return 1;
+      } else if (tok == TOK_SYM) {
+        if (fetch(str, TOK_SYM, node, NOD_SYM, line, lnum)) return 1;
       } else if (tok == TOK_ID) {
         if (fetch(str, TOK_ID, node, NOD_ID, line, lnum)) return 1;
       } else {
@@ -433,8 +434,9 @@ variables(node_t * node, map_t * prev, const char * file) {
     } else if (node->type == NOD_NUM) {
       if (toktoi(&node->tok, file, &node->val.i)) return 1;
       node->type = NOD_INT;
-    } else if (node->type == NOD_BOL) {
+    } else if (node->type == NOD_SYM) {
       node->val.i = !tokcmp(&node->tok, "#t");
+      node->type = NOD_BOL;
     } else if (node->type == NOD_ID) {
       tok_t * tok = &node->tok;
       var_t var;
@@ -485,7 +487,7 @@ semantic(node_t * parent, map_t * prev, const char * file) {
   } else if (node->type == NOD_NUM) {
     tok_t * tok = &node->tok;
     return error(tok, file, "integer is not a function\n"), 1;
-  } else if (node->type == NOD_BOL) {
+  } else if (node->type == NOD_SYM) {
     tok_t * tok = &node->tok;
     return error(tok, file, "boolean is not a function\n"), 1;
   } else if (node->type == NOD_ID) {
