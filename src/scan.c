@@ -105,6 +105,7 @@ nodtoa(int tok) {
     "NIL",
     "NUM",
     "INT",
+    "SYM",
     "BOL",
     "ID",
     "VAR",
